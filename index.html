@@ -86,6 +86,71 @@ const APP_KEY='student_guidance_unified_v2';
 const OLD_KEY='student_guidance_unified_v1';
 const DRIVE_URL_KEY='student_guidance_drive_folder_v1';
 const DRIVE_QR_KEY='student_guidance_drive_qr_v1';
+
+/* تخزين دائم لبيانات Drive وQR على iPhone/Safari باستخدام IndexedDB */
+const DRIVE_DB_NAME='student_guidance_persistent_v1';
+const DRIVE_DB_STORE='settings';
+let driveState={url:'',qr:''};
+
+function openDriveDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DRIVE_DB_NAME,1);
+    req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(DRIVE_DB_STORE))db.createObjectStore(DRIVE_DB_STORE)};
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function driveDBGet(key){
+  try{
+    const db=await openDriveDB();
+    return await new Promise((resolve,reject)=>{
+      const tx=db.transaction(DRIVE_DB_STORE,'readonly');
+      const r=tx.objectStore(DRIVE_DB_STORE).get(key);
+      r.onsuccess=()=>resolve(r.result||'');
+      r.onerror=()=>reject(r.error);
+    });
+  }catch(e){return ''}
+}
+async function driveDBSet(key,value){
+  try{
+    const db=await openDriveDB();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(DRIVE_DB_STORE,'readwrite');
+      tx.objectStore(DRIVE_DB_STORE).put(value,key);
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error);
+    });
+    return true;
+  }catch(e){return false}
+}
+async function driveDBDelete(key){
+  try{
+    const db=await openDriveDB();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(DRIVE_DB_STORE,'readwrite');
+      tx.objectStore(DRIVE_DB_STORE).delete(key);
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error);
+    });
+    return true;
+  }catch(e){return false}
+}
+async function initDrivePersistence(){
+  let url=await driveDBGet(DRIVE_URL_KEY);
+  let qr=await driveDBGet(DRIVE_QR_KEY);
+  const oldUrl=localStorage.getItem(DRIVE_URL_KEY)||'';
+  const oldQr=localStorage.getItem(DRIVE_QR_KEY)||'';
+
+  if(!url && oldUrl){url=oldUrl;await driveDBSet(DRIVE_URL_KEY,url)}
+  if(!qr && oldQr){qr=oldQr;await driveDBSet(DRIVE_QR_KEY,qr)}
+
+  driveState.url=url||oldUrl||'';
+  driveState.qr=qr||oldQr||'';
+
+  if(driveState.url) try{localStorage.setItem(DRIVE_URL_KEY,driveState.url)}catch(e){}
+  if(driveState.qr) try{localStorage.setItem(DRIVE_QR_KEY,driveState.qr)}catch(e){}
+  renderDrivePanel();
+}
 const $=id=>document.getElementById(id);
 const today=()=>{let d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
@@ -180,23 +245,51 @@ const exportDefs={
 };
 function renderDrivePanel(){
  const box=$('driveQrBox'),view=$('driveUrlView');if(!box||!view)return;
- const url=localStorage.getItem(DRIVE_URL_KEY)||'';
- const qr=localStorage.getItem(DRIVE_QR_KEY)||'';
+ const url=driveState.url||localStorage.getItem(DRIVE_URL_KEY)||'';
+ const qr=driveState.qr||localStorage.getItem(DRIVE_QR_KEY)||'';
  view.textContent=url||'لم يتم حفظ رابط بعد';
  box.innerHTML=qr?`<img src="${qr}" alt="QR لمجلد Google Drive">`:'<span>اضغط هنا لإضافة صورة<br><b>QR للمجلد</b><br><small>من ملفات الجهاز</small></span>';
 }
 function validDriveFolderUrl(url){try{const u=new URL(url);return u.protocol==='https:'&&u.hostname==='drive.google.com'}catch{return false}}
-function requestDriveFolder(firstUse=false){
- const current=localStorage.getItem(DRIVE_URL_KEY)||'';
- const msg=firstUse?'أدخل رابط مجلد Google Drive الذي سيحتوي جميع ملفات النظام. سيُحفظ الرابط على هذا الجهاز ويمكن تغييره لاحقًا.':'أدخل رابط مجلد Google Drive:';
- const value=prompt(msg,current);if(value===null)return false;
+function requestDriveFolder(firstRun){
+ const current=driveState.url||localStorage.getItem(DRIVE_URL_KEY)||'';
+ const value=prompt(firstRun?'أدخل رابط مجلد Google Drive الذي ستُرفع إليه ملفات النظام:':'أدخل/عدّل رابط مجلد Google Drive:',current);
+ if(value===null)return false;
  const url=value.trim();if(!url){alert('لم يتم إدخال رابط. يمكنك إضافته لاحقًا من صفحة مجلد Drive وQR.');return false}
- if(!validDriveFolderUrl(url)){alert('الرابط لا يبدو رابط Google Drive صالحًا. انسخ رابط المجلد من Google Drive ثم حاول مرة أخرى.');return false}
- localStorage.setItem(DRIVE_URL_KEY,url);renderDrivePanel();alert('تم حفظ رابط مجلد Google Drive.');return true;
+ if(!validDriveFolderUrl(url)){alert('الرابط غير صحيح. يجب أن يبدأ بـ https://drive.google.com/');return false}
+ driveState.url=url;
+ try{localStorage.setItem(DRIVE_URL_KEY,url)}catch(e){}
+ driveDBSet(DRIVE_URL_KEY,url);
+ renderDrivePanel();alert('تم حفظ رابط مجلد Google Drive بشكل دائم على هذا الجهاز.');return true;
 }
-function openDriveFolder(){let url=localStorage.getItem(DRIVE_URL_KEY)||'';if(!url){if(!requestDriveFolder(false))return;url=localStorage.getItem(DRIVE_URL_KEY)||''}if(url)window.open(url,'_blank')}
-function saveDriveQR(e){const f=e.target.files&&e.target.files[0];if(!f)return;if(!f.type.startsWith('image/')){alert('اختر صورة QR فقط');e.target.value='';return}const r=new FileReader();r.onload=ev=>{try{localStorage.setItem(DRIVE_QR_KEY,ev.target.result);renderDrivePanel();alert('تم حفظ صورة QR داخل البرنامج.')}catch{alert('تعذر حفظ الصورة. جرّب صورة أصغر.')}};r.readAsDataURL(f);e.target.value=''}
-function removeDriveQR(){if(!localStorage.getItem(DRIVE_QR_KEY))return alert('لا توجد صورة QR محفوظة');if(confirm('حذف صورة QR المحفوظة؟')){localStorage.removeItem(DRIVE_QR_KEY);renderDrivePanel()}}
+function openDriveFolder(){
+ let url=driveState.url||localStorage.getItem(DRIVE_URL_KEY)||'';
+ if(!url){if(!requestDriveFolder(false))return;url=driveState.url||localStorage.getItem(DRIVE_URL_KEY)||''}
+ if(url)window.open(url,'_blank')
+}
+function saveDriveQR(e){
+ const f=e.target.files&&e.target.files[0];if(!f)return;
+ if(!f.type.startsWith('image/')){alert('اختر صورة QR فقط');e.target.value='';return}
+ const r=new FileReader();
+ r.onload=async ev=>{
+   const value=ev.target.result;
+   driveState.qr=value;
+   try{localStorage.setItem(DRIVE_QR_KEY,value)}catch(e){}
+   const ok=await driveDBSet(DRIVE_QR_KEY,value);
+   renderDrivePanel();
+   alert(ok?'تم حفظ صورة QR بشكل دائم على هذا الجهاز.':'تم حفظ الصورة مؤقتًا، لكن تعذر التخزين الدائم. تأكد أن Safari ليس في التصفح الخاص.');
+ };
+ r.readAsDataURL(f);e.target.value=''
+}
+async function removeDriveQR(){
+ if(!(driveState.qr||localStorage.getItem(DRIVE_QR_KEY)))return alert('لا توجد صورة QR محفوظة');
+ if(confirm('حذف صورة QR المحفوظة؟')){
+   driveState.qr='';
+   try{localStorage.removeItem(DRIVE_QR_KEY)}catch(e){}
+   await driveDBDelete(DRIVE_QR_KEY);
+   renderDrivePanel()
+ }
+}
 function offerDriveUpload(fileLabel){if(confirm(`تم تجهيز ${fileLabel}.\n\nهل تريد فتح مجلد Google Drive الآن لرفع الملف؟`))openDriveFolder()}
 function rowsFor(section){const def=exportDefs[section];return db[section].map(r=>def.cols.map(([k])=>k==='day'?(r[k]||dayName(r.date)):(r[k]??'')))}
 function xmlEsc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
@@ -208,7 +301,7 @@ function exportPDF(section){
   if(!w){alert('اسمح بالنوافذ المنبثقة لإنشاء التقرير');return false}
   const head=def.cols.map(c=>`<th>${esc(c[1])}</th>`).join('');
   const body=rows.map(row=>'<tr>'+row.map(v=>`<td>${esc(v)}</td>`).join('')+'</tr>').join('');
-  const driveUrl=localStorage.getItem(DRIVE_URL_KEY)||'';
+  const driveUrl=driveState.url||localStorage.getItem(DRIVE_URL_KEY)||'';
   w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${def.title}</title><style>
     @page{size:A4 landscape;margin:10mm}
     *{box-sizing:border-box}
@@ -250,7 +343,10 @@ function clearAllData(){if(confirm('سيتم مسح جميع بيانات الت
 ['da_date','at_date','bh_date','he_date','so_date','ma_date','ev_date','gu_date','fo_date','ac_date'].forEach(id=>{if($(id))$(id).value=today()});[['da_date','da_day'],['at_date','at_day'],['bh_date','bh_day'],['he_date','he_day'],['so_date','so_day'],['ma_date','ma_day'],['ev_date','ev_day'],['gu_date','gu_day']].forEach(x=>syncDay(...x));
 enhanceCustomOptions();
 bindDateDaySync();
-buildNav();renderAll();save();setTimeout(()=>{if(!localStorage.getItem(DRIVE_URL_KEY))requestDriveFolder(true)},500);
+buildNav();renderAll();save();
+initDrivePersistence().then(()=>{
+  setTimeout(()=>{if(!(driveState.url||localStorage.getItem(DRIVE_URL_KEY)))requestDriveFolder(true)},500);
+});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 </script>
 </body></html>
