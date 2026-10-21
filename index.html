@@ -313,7 +313,7 @@ function clearAllData(){if(confirm('سيتم مسح جميع بيانات الت
 ['da_date','at_date','bh_date','he_date','so_date','ma_date','ev_date','gu_date','fo_date','ac_date'].forEach(id=>{if($(id))$(id).value=today()});[['da_date','da_day'],['at_date','at_day'],['bh_date','bh_day'],['he_date','he_day'],['so_date','so_day'],['ma_date','ma_day'],['ev_date','ev_day'],['gu_date','gu_day']].forEach(x=>syncDay(...x));
 enhanceCustomOptions();
 bindDateDaySync();
-buildNav();renderAll();save();
+buildNav();renderAll();
 initDrivePersistence().then(()=>{
   setTimeout(()=>{if(!(driveState.url||localStorage.getItem(DRIVE_URL_KEY)))requestDriveFolder(true)},500);
 });
