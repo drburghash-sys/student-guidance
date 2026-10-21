@@ -1,4 +1,4 @@
-const CACHE_NAME='student-guidance-v9';
+const CACHE_NAME='student-guidance-v10';
 const APP_FILES=['./','./index.html','./report-pdf.js','./daily-recovery.js','./daily-recovery.enc.json','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(APP_FILES)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));self.clients.claim();});
