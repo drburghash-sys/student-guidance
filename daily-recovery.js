@@ -35,8 +35,8 @@
     return payload.records.map((r,i)=>{
       if(!Array.isArray(r)||r.length!==6||!r.slice(0,5).every(v=>typeof v==='string'))throw new Error('بيانات سجل غير صالحة.');
       return {id:SOURCE+String(i+1).padStart(2,'0'),name:r[0],grade:r[1],classroom:r[2],
-        date:r[3],day:dayOf(r[3]),type:r[4],phone:'',minutes:'',
-        notes:REVIEW_NOTE+(r[5]?'يرجى مطابقة الاسم والتفاصيل مع الصورة الأصلية.':'')};
+        date:r[3],day:r[3]?dayOf(r[3]):'الاثنين',type:r[4],phone:'',minutes:'',
+        notes:REVIEW_NOTE+(r[5]?'يرجى مطابقة الاسم والتفاصيل مع الصورة الأصلية. ':'')+(!r[3]?'التاريخ غير ظاهر في الصورة.':'')};
     });
   }
   function restoreStore(records) {
