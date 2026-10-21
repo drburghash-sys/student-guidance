@@ -47,6 +47,7 @@ button{touch-action:manipulation}
 
 .select-add-wrap{display:flex;gap:6px;align-items:stretch}.select-add-wrap select{flex:1;min-width:0}.add-option-btn{width:42px;min-width:42px;border:0;border-radius:12px;background:#eef2ff;color:#5144d8;font:inherit;font-size:22px;font-weight:900;cursor:pointer;line-height:1}.add-option-btn:active{transform:scale(.96)}
 </style>
+<script src="./report-pdf.js"></script>
 </head>
 <body>
 <div class="app">
@@ -294,39 +295,7 @@ function offerDriveUpload(fileLabel){if(confirm(`تم تجهيز ${fileLabel}.\n
 function rowsFor(section){const def=exportDefs[section];return db[section].map(r=>def.cols.map(([k])=>k==='day'?(r[k]||dayName(r.date)):(r[k]??'')))}
 function xmlEsc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function exportExcel(section){const def=exportDefs[section],rows=rowsFor(section);if(!rows.length){alert('لا توجد بيانات للتصدير');return false}let xml=`<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="${xmlEsc(def.title).slice(0,25)}"><Table>`;xml+='<Row>'+def.cols.map(c=>`<Cell><Data ss:Type="String">${xmlEsc(c[1])}</Data></Cell>`).join('')+'</Row>';rows.forEach(row=>{xml+='<Row>'+row.map(v=>`<Cell><Data ss:Type="String">${xmlEsc(v)}</Data></Cell>`).join('')+'</Row>'});xml+='</Table></Worksheet></Workbook>';downloadBlob(new Blob(['\ufeff'+xml],{type:'application/vnd.ms-excel'}),`${def.code}_${def.title}_${today()}.xls`);return true}
-function exportPDF(section){
-  const def=exportDefs[section],rows=rowsFor(section);
-  if(!rows.length){alert('لا توجد بيانات للتصدير');return false}
-  const w=window.open('','_blank');
-  if(!w){alert('اسمح بالنوافذ المنبثقة لإنشاء التقرير');return false}
-  const head=def.cols.map(c=>`<th>${esc(c[1])}</th>`).join('');
-  const body=rows.map(row=>'<tr>'+row.map(v=>`<td>${esc(v)}</td>`).join('')+'</tr>').join('');
-  const driveUrl=driveState.url||localStorage.getItem(DRIVE_URL_KEY)||'';
-  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${def.title}</title><style>
-    @page{size:A4 landscape;margin:10mm}
-    *{box-sizing:border-box}
-    body{font-family:Tahoma,Arial,sans-serif;color:#111;margin:0;background:#f3f4f6;padding:calc(12px + env(safe-area-inset-top)) 12px calc(24px + env(safe-area-inset-bottom))}
-    .report-actions{position:sticky;top:0;z-index:50;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;background:rgba(255,255,255,.96);padding:10px;border:1px solid #ddd;border-radius:14px;margin:0 auto 12px;max-width:1100px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
-    .report-actions button{border:0;border-radius:10px;padding:11px 16px;font:700 15px Tahoma,Arial;cursor:pointer;min-height:44px}
-    .savebtn{background:#2563eb;color:white}.drivebtn{background:#16a34a;color:white}.closebtn{background:#e5e7eb;color:#111}
-    .hint{width:100%;text-align:center;font-size:12px;color:#555;line-height:1.6}
-    .paper{background:white;max-width:1100px;margin:auto;padding:16px;box-shadow:0 3px 16px rgba(0,0,0,.08)}
-    h1{text-align:center;font-size:20px;margin:0 0 6px}.meta{text-align:center;margin-bottom:12px;color:#555;font-size:12px}
-    table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #888;padding:6px;text-align:right;vertical-align:top}th{background:#eee}tr{page-break-inside:avoid}
-    @media(max-width:700px){body{padding-left:6px;padding-right:6px}.paper{padding:8px;overflow:auto}.report-actions{border-radius:12px}.report-actions button{flex:1 1 45%;font-size:14px}table{font-size:9px;min-width:760px}}
-    @media print{body{background:white;padding:0}.report-actions{display:none!important}.paper{box-shadow:none;max-width:none;margin:0;padding:0}}
-  </style></head><body>
-  <div class="report-actions">
-    <button class="savebtn" onclick="window.print()">حفظ / طباعة PDF</button>
-    ${driveUrl?`<button class="drivebtn" onclick="window.open('${driveUrl.replace(/'/g,"\\'")}','_blank')">فتح Google Drive</button>`:''}
-    <button class="closebtn" onclick="window.close()">رجوع</button>
-    <div class="hint">على iPhone: اضغط «حفظ / طباعة PDF»، ثم من معاينة الطباعة استخدم زر المشاركة واختر «حفظ في الملفات».</div>
-  </div>
-  <div class="paper"><h1>${def.title}</h1><div class="meta">${def.code} — تاريخ التقرير: ${fmt(today())}</div><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>
-  </body></html>`);
-  w.document.close();
-  return true
-}
+function exportPDF(section){return showPdfReport(section)}
 function exportSection(section,type){
   const def=exportDefs[section];
   if(type==='excel'){
