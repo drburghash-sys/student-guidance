@@ -24,7 +24,7 @@
       '#pdfReportOverlay .pdf-paper{max-width:1100px;margin:auto;padding:18px;background:#fff;box-shadow:0 3px 15px #0001;overflow-x:auto}',
       '#pdfReportOverlay h1{text-align:center;font-size:20px;margin:0 0 6px}',
       '#pdfReportOverlay .pdf-meta{text-align:center;color:#555;font-size:12px;margin-bottom:12px}',
-      '#pdfReportOverlay table{width:100%;min-width:850px;border-collapse:collapse;font-size:11px}',
+      '#pdfReportOverlay table{width:100%;min-width:850px;border-collapse:collapse;font-size:11px;direction:rtl}',
       '#pdfReportOverlay th,#pdfReportOverlay td{border:1px solid #888;padding:7px;text-align:right;vertical-align:top;overflow-wrap:anywhere}',
       '#pdfReportOverlay th{background:#e8edf4}',
       '#pdfReportOverlay tr{break-inside:avoid;page-break-inside:avoid}',
@@ -171,8 +171,10 @@
     var available = W - 64;
     var sum = weights.reduce(function (a,b) { return a+b; },0);
     var widths = weights.map(function (v) { return v * available / sum; });
-    var lefts = [], x = 32;
-    for (var i=0;i<widths.length;i++) { lefts.push(x); x+=widths[i]; }
+    // RTL layout: the first (student-name) column begins at the RIGHT page margin.
+    // Move left after each column; preserve the source order and every record value.
+    var lefts = [], rightEdge = W - 32;
+    for (var i=0;i<widths.length;i++) { rightEdge -= widths[i]; lefts.push(rightEdge); }
     var images=[], y=0, page=0, rowCounter=0, bottom=748;
     var lineH=18, padding=7;
 
@@ -259,7 +261,7 @@
       '<button type="button" class="pdf-muted" id="pdfClose">رجوع</button>' +
       '<div class="pdf-status" id="pdfStatus" role="status">جارٍ تجهيز ملف PDF…</div></div>' +
       '<div class="pdf-paper"><h1>'+h(def.title)+'</h1><div class="pdf-meta">'+h(def.code)+' — تاريخ التقرير: '+h(today())+'</div>' +
-      '<table><thead><tr>'+headers+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+      '<table dir="rtl"><thead><tr>'+headers+'</tr></thead><tbody>'+body+'</tbody></table></div>';
     document.body.appendChild(view);
     view.querySelector('#pdfClose').addEventListener('click',closeReport);
     view.querySelector('#pdfPrint').addEventListener('click',function(){window.print();});
